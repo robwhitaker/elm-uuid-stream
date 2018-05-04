@@ -1,0 +1,17 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>UUID Generator</title>
+		<script type="text/javascript" src="elm.js"></script>
+	</head>
+	<body>
+		<script>
+			var seeds = Array.from((window.crypto || window.msCrypto).getRandomValues(new Uint32Array(5)));
+			Elm.Main.fullscreen(
+				{ firstInt : seeds[0]
+				, extensions : seeds.slice(1)
+				});
+		</script>
+	</body>
+</html>
