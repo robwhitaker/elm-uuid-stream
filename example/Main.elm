@@ -8,7 +8,7 @@ import UuidStream exposing (..)
 
 
 type alias Model =
-    { uuidStream : UuidStringStream
+    { uuidStream : UuidStream String
     , uuidList : List String
     }
 

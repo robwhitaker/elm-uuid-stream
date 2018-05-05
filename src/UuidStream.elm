@@ -1,7 +1,6 @@
 module UuidStream
     exposing
         ( UuidStream
-        , UuidStringStream
         , consume
         , consumeMany
         , uuidStream
@@ -16,15 +15,12 @@ The actual UUID generation is handled by [Zinggi's Uuid library](http://package.
 look at the documentation for that as it explains how to properly seed the generator so
 you don't end up with duplicate UUIDs!
 
+@docs UuidStream
+
 
 ## Stream Generators
 
 @docs uuidStream, uuidStringStream
-
-
-## Stream Types
-
-@docs UuidStream, UuidStringStream
 
 
 ## Stream Consumers
@@ -33,12 +29,9 @@ you don't end up with duplicate UUIDs!
 
 -}
 
+import InfiniteStream as Stream exposing (Stream)
 import Random.Pcg.Extended as Random exposing (Generator, Seed)
 import Uuid exposing (Uuid)
-
-
-type Stream a
-    = Cons a (() -> Stream a)
 
 
 mkStream : Generator a -> Seed -> Stream a
@@ -47,57 +40,48 @@ mkStream generator seed =
         ( item, newSeed ) =
             Random.step generator seed
     in
-        Cons item (\() -> mkStream generator newSeed)
+        Stream.stream item (\() -> mkStream generator newSeed)
 
 
-{-| An infinite stream of [Uuids](http://package.elm-lang.org/packages/Zinggi/elm-uuid/1.0.0/Uuid#Uuid).
+{-| An infinite stream of UUIDs.
 -}
-type alias UuidStream =
-    Stream Uuid
+type UuidStream uuid
+    = UuidStream (Stream uuid)
 
 
 {-| Create an infinite stream of [Uuids](http://package.elm-lang.org/packages/Zinggi/elm-uuid/1.0.0/Uuid#Uuid) from integer seeds. It's best to
 generate these integers via JavaScript with `window.crypto.getRandomValues(..)`. More on that [here](http://package.elm-lang.org/packages/Zinggi/elm-random-pcg-extended/2.1.0/Random-Pcg-Extended#initialSeed).
 -}
-uuidStream : Int -> List Int -> UuidStream
+uuidStream : Int -> List Int -> UuidStream Uuid
 uuidStream seed seedExtension =
-    mkStream Uuid.generator (Random.initialSeed seed seedExtension)
+    UuidStream (mkStream Uuid.generator (Random.initialSeed seed seedExtension))
 
 
-{-| An infinite stream of UUID Strings in the canonical 8-4-4-4-12 form (e.g. "8e1c60e6-8860-48d6-82ee-cc894810490d").
+{-| The same as `uuidStream` but returns a stream of UUIDs as `String`s.
+The strings are in the canonical 8-4-4-4-12 form (e.g. "8e1c60e6-8860-48d6-82ee-cc894810490d").
 -}
-type alias UuidStringStream =
-    Stream String
-
-
-{-| The same as `uuidStream` but returns a `UuidStringStream`.
--}
-uuidStringStream : Int -> List Int -> UuidStringStream
+uuidStringStream : Int -> List Int -> UuidStream String
 uuidStringStream seed seedExtension =
-    mkStream Uuid.stringGenerator (Random.initialSeed seed seedExtension)
+    UuidStream (mkStream Uuid.stringGenerator (Random.initialSeed seed seedExtension))
 
 
 {-| Consume an element of a stream, producing a tuple with the next value and a new stream.
 -}
-consume : Stream uuid -> ( uuid, Stream uuid )
-consume (Cons value next) =
-    ( value, next () )
+consume : UuidStream uuid -> ( uuid, UuidStream uuid )
+consume (UuidStream stream) =
+    let
+        ( uuid, newStream ) =
+            Stream.consume stream
+    in
+        ( uuid, UuidStream newStream )
 
 
 {-| Consume multiple elements of a stream, producing a tuple with a list of values and a new stream.
 -}
-consumeMany : Int -> Stream uuid -> ( List uuid, Stream uuid )
-consumeMany numToConsume stream =
+consumeMany : Int -> UuidStream uuid -> ( List uuid, UuidStream uuid )
+consumeMany n (UuidStream stream) =
     let
-        go n ( acc, currentStream ) =
-            if n > 0 then
-                let
-                    ( value, newStream ) =
-                        consume currentStream
-                in
-                    go (n - 1) ( value :: acc, newStream )
-
-            else
-                ( List.reverse acc, currentStream )
+        ( uuids, newStream ) =
+            Stream.consumeMany n stream
     in
-        go numToConsume ( [], stream )
+        ( uuids, UuidStream newStream )
